@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>提词器遥控器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: none;
+        }
+        
+        .header {
+            padding: 10px 15px;
+            background: #2a2a2a;
+            text-align: center;
+            border-bottom: 1px solid #333;
+            flex-shrink: 0;
+        }
+        
+        .header h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .status-connected {
+            background: #4CAF50;
+        }
+        
+        .status-disconnected {
+            background: #ff9800;
+        }
+        
+        .status-error {
+            background: #f44336;
+        }
+        
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 60px;
+        }
+        
+        button:hover {
+            background: #1976D2;
+        }
+        
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        
+        .scroll-control {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            background: transparent;
+        }
+        
+        /* 竖屏样式 */
+        @media (orientation: portrait) {
+            .scroll-control {
+                width: 50vw;
+                height: 70vh;
+            }
+            
+            .instructions {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+        
+        /* 横屏样式 */
+        @media (orientation: landscape) {
+            .scroll-control {
+                width: 70vh;
+                height: 50vw;
+            }
+            
+            .instructions {
+                padding: 5px;
+                font-size: 12px;
+            }
+        }
+        
+        .position-info {
+            text-align: center;
+            font-size: 16px;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+        
+        .position-value {
+            font-weight: bold;
+            color: #2196F3;
+            font-size: 18px;
+        }
+        
+        .instructions {
+            text-align: center;
+            color: #888;
+            flex-shrink: 0;
+            padding: 15px;
+        }
+        
+        .play-state {
+            text-align: center;
+            margin: 5px 0;
+            font-size: 14px;
+            color: #ccc;
+        }
+        
+        /* 新的箭头按钮样式 */
+        .arrow-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .arrow-btn {
+            width: 80px;
+            height: 80px;
+            background: #2196F3;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 32px;
+            color: white;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        .arrow-btn:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        
+        .arrow-btn:active {
+            background: #0D47A1;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .arrow-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .middle-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        .middle-btn {
+            flex: 1;
+            max-width: 80px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>📱 提词器遥控器</h2>
+        <div class="connection-status">
+            <span class="status-indicator" id="connection-indicator"></span>
+            <span id="status">连接中...</span>
+        </div>
+        
+        <div class="play-state">
+            状态: <span id="play-state-display">已暂停</span>
+        </div>
+    </div>
+    
+    <div class="main-content">
+        <div class="scroll-control">
+            <div class="position-info">
+                当前位置: <span class="position-value" id="position-display">0px</span>
+            </div>
+            
+            <div class="arrow-buttons">
+                <!-- 向上箭头按钮 -->
+                <button class="arrow-btn" id="up-arrow">↑</button>
+                
+                <!-- 中间的按钮组 -->
+                <div class="middle-buttons">
+                    <button class="middle-btn" id="play-btn">开始</button>
+                    <button class="middle-btn" id="pause-btn" disabled>暂停</button>
+                    <button class="middle-btn" id="reset-btn">重置</button>
+                </div>
+                
+                <!-- 向下箭头按钮 -->
+                <button class="arrow-btn" id="down-arrow">↓</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        使用箭头按钮控制提词器滚动
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        let reconnectTimeout = null;
+        let maxScrollPosition = 1000; // 默认值，会被实际值覆盖
+        let currentPosition = 0; // 当前滚动位置
+        const scrollStep = 50; // 每次点击箭头滚动的距离
+        
+        // 初始化WebSocket连接
+        function connectWebSocket() {
+            try {
+                // 清除之前的连接
+                if (ws) {
+                    ws.close();
+                }
+                
+                // 清除重连定时器
+                if (reconnectTimeout) {
+                    clearTimeout(reconnectTimeout);
+                    reconnectTimeout = null;
+                }
+                
+                // 使用服务器实际IP地址，而不是localhost
+                // 将 '10.85.6.252' 替换为您的电脑实际IP地址
+                const serverIP = '10.85.6.252'; // 修改为您的电脑IP
+                const wsUrl = `ws://${serverIP}:3000/remote`;
+                console.log('正在连接到:', wsUrl);
+                
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    isConnected = true;
+                    reconnectAttempts = 0;
+                    updateConnectionStatus('connected', '已连接');
+                    console.log('✅ 遥控器已连接到服务器');
+
+                    // 请求当前状态
+                    sendCommand('getStatus', true);
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('📨 遥控器收到服务器消息:', data);
+                        handleRemoteMessage(data);
+                    } catch (e) {
+                        console.error('❌ 消息解析错误:', e);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    isConnected = false;
+                    console.log('🔌 WebSocket连接关闭:', event.code, event.reason);
+                    handleDisconnection(event);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('❌ WebSocket错误:', error);
+                    updateConnectionStatus('error', '连接错误');
+                };
+                
+            } catch (error) {
+                console.error('❌ 连接WebSocket失败:', error);
+                handleDisconnection();
+            }
+        }
+        
+        // 处理断开连接
+        function handleDisconnection(event) {
+            isConnected = false;
+            
+            if (event && event.code === 1000) {
+                // 正常关闭
+                updateConnectionStatus('disconnected', '已断开');
+            } else {
+                // 异常断开，尝试重连
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    const delay = Math.min(1000 * reconnectAttempts, 5000);
+                    updateConnectionStatus('disconnected', `连接断开，${delay/1000}秒后重试...`);
+                    
+                    reconnectTimeout = setTimeout(() => {
+                        console.log(`🔄 尝试重连 (${reconnectAttempts}/${maxReconnectAttempts})`);
+                        connectWebSocket();
+                    }, delay);
+                } else {
+                    updateConnectionStatus('error', '连接失败，请刷新页面重试');
+                }
+            }
+        }
+        
+        // 更新连接状态显示
+        function updateConnectionStatus(status, message) {
+            const indicator = document.getElementById('connection-indicator');
+            const statusElement = document.getElementById('status');
+            
+            indicator.className = 'status-indicator';
+            statusElement.textContent = message;
+            
+            switch(status) {
+                case 'connected':
+                    indicator.classList.add('status-connected');
+                    break;
+                case 'disconnected':
+                    indicator.classList.add('status-disconnected');
+                    break;
+                case 'error':
+                    indicator.classList.add('status-error');
+                    break;
+            }
+        }
+        
+        // 发送控制命令
+        function sendCommand(command, value) {
+            if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
+                try {
+                    const message = {
+                        type: command,
+                        value: value,
+                        timestamp: Date.now()
+                    };
+                    console.log(`📤 遥控器发送命令:`, message);
+                    ws.send(JSON.stringify(message));
+                } catch (error) {
+                    console.error('❌ 发送命令失败:', error);
+                }
+            } else {
+                console.warn('⚠️ WebSocket未连接，无法发送命令');
+                updateConnectionStatus('disconnected', '未连接，无法发送命令');
+            }
+        }
+        
+        // 处理从提词器接收的消息
+        function handleRemoteMessage(data) {
+            console.log('📨 遥控器处理消息:', data);
+            
+            switch(data.type) {
+                case 'positionUpdate':
+                    console.log('更新位置:', data.value);
+                    currentPosition = data.value;
+                    document.getElementById('position-display').textContent = 
+                        Math.round(data.value) + 'px';
+                    break;
+                case 'textHeight':
+                    console.log('更新最大滚动位置:', data.value);
+                    if (data.value > 0) {
+                        maxScrollPosition = data.value;
+                    }
+                    break;
+                case 'playState':
+                    console.log('播放状态更新:', data.value);
+                    updatePlayState(data.value);
+                    break;
+                case 'connectionStatus':
+                    if (data.value === 'display_connected') {
+                        console.log('✅ 提词器已连接');
+                        updateConnectionStatus('connected', '提词器已连接');
+                    } else if (data.value === 'display_disconnected') {
+                        console.log('🔌 提词器已断开');
+                        updateConnectionStatus('disconnected', '提词器已断开');
+                    }
+                    break;
+                default:
+                    console.log('未知消息类型:', data.type);
+            }
+        }
+        
+        // 更新播放状态显示
+        function updatePlayState(isPlaying) {
+            const playBtn = document.getElementById('play-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            const playStateDisplay = document.getElementById('play-state-display');
+            
+            if (isPlaying) {
+                playBtn.disabled = true;
+                pauseBtn.disabled = false;
+                playStateDisplay.textContent = '滚动中';
+                playStateDisplay.style.color = '#4CAF50';
+            } else {
+                playBtn.disabled = false;
+                pauseBtn.disabled = true;
+                playStateDisplay.textContent = '已暂停';
+                playStateDisplay.style.color = '#ff9800';
+            }
+        }
+        
+        // 初始化箭头按钮控制
+        function initArrowControls() {
+            const upArrow = document.getElementById('up-arrow');
+            const downArrow = document.getElementById('down-arrow');
+            
+            upArrow.addEventListener('click', () => {
+                // 向上滚动，减少位置
+                const newPosition = Math.max(0, currentPosition - scrollStep);
+                console.log(`遥控器向上滚动: ${newPosition}px`);
+                sendCommand('scrollPosition', newPosition);
+                // 手动滚动时暂停自动滚动
+                sendCommand('pause', true);
+            });
+            
+            downArrow.addEventListener('click', () => {
+                // 向下滚动，增加位置
+                const newPosition = Math.min(maxScrollPosition, currentPosition + scrollStep);
+                console.log(`遥控器向下滚动: ${newPosition}px`);
+                sendCommand('scrollPosition', newPosition);
+                // 手动滚动时暂停自动滚动
+                sendCommand('pause', true);
+            });
+        }
+        
+        // 初始化按钮控制
+        function initButtonControls() {
+            const playBtn = document.getElementById('play-btn');
+            const pauseBtn = document.getElementById('pause-btn');
+            const resetBtn = document.getElementById('reset-btn');
+    
+            playBtn.addEventListener('click', () => {
+                  console.log('遥控器发送开始命令');
+                  // 立即更新本地状态
+                  updatePlayState(true);
+                  sendCommand('play', true);
+            });
+    
+            pauseBtn.addEventListener('click', () => {
+                   console.log('遥控器发送暂停命令');
+                   // 立即更新本地状态
+                   updatePlayState(false);
+                   sendCommand('pause', true);
+            });
+    
+            resetBtn.addEventListener('click', () => {
+                  console.log('遥控器发送重置命令');
+                  // 重置时也设置为暂停状态
+                  updatePlayState(false);
+                  sendCommand('reset', true);
+            });
+        }
+        
+        // 页面可见性变化时重连
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && !isConnected) {
+                console.log('页面变为可见，尝试重连');
+                connectWebSocket();
+            }
+        });
+        
+        // 初始化
+        console.log('🚀 初始化遥控器...');
+        connectWebSocket();
+        initArrowControls();
+        initButtonControls();
+        
+        console.log('✅ 遥控器初始化完成');
+    </script>
+</body>
+</html>
