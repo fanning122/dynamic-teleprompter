@@ -322,7 +322,19 @@
         }
         
         function connectWebSocket() {
-            console.log("Display 连接地址:", serverUrl);
+            // 🎯 新增调试信息开始
+            console.log("=== DISPLAY 连接调试信息 ===");
+            console.log("1. 当前页面地址:", window.location.href);
+            console.log("2. 主机名:", window.location.hostname);
+            console.log("3. 是否本地环境:", isLocal);
+            console.log("4. 最终连接地址:", serverUrl);
+            console.log("=== 调试信息结束 ===");
+    
+            // 在页面上也显示连接信息（手机端能看到）
+            updateDebugInfo(`尝试连接到: ${serverUrl}`);
+            // 🎯 新增调试信息结束
+    
+            // 下面是你原有的代码
             updateDebugInfo(`尝试连接: ${serverUrl}`);
             
             try {
