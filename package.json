@@ -1,0 +1,1 @@
+{ "name": "dtp-root", "version": "1.0.0", "scripts": { "start": "cd backend && node websocket_server.js" } } 
