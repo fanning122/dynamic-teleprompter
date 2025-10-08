@@ -707,5 +707,31 @@
         
         window.addEventListener('load', init);
     </script>
+    <!-- 手机端调试面板 -->
+    <div id="mobile-debug" style="
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        max-width: 90%;
+        z-index: 10000;
+    ">
+        <div>状态: <span id="debug-status">等待连接...</span></div>
+        <div>消息: <span id="debug-message">-</span></div>
+        <div>时间: <span id="debug-time">-</span></div>
+    </div>
+
+    <script>
+    // 调试信息更新函数
+    function updateMobileDebug(status, message) {
+        document.getElementById('debug-status').textContent = status;
+        document.getElementById('debug-message').textContent = message;
+        document.getElementById('debug-time').textContent = new Date().toLocaleTimeString();
+    }
+    </script>
 </body>
 </html>
