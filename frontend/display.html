@@ -305,10 +305,21 @@
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         
-        // 自动检测服务器地址
-        const serverHost = window.location.hostname;
-        const serverPort = window.location.port || '8080';
-        const serverUrl = `ws://${serverHost}:${serverPort}?type=display`;
+        // 自动检测服务器地址 - 支持本地和 Heroku 部署
+        const isLocal = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' ||
+                        window.location.hostname.includes('192.168.');
+
+        let serverUrl;
+        if (isLocal) {
+            // 本地开发环境
+            const serverHost = window.location.hostname;
+            const serverPort = window.location.port || '3000';
+            serverUrl = `ws://${serverHost}:${serverPort}?type=controller`;
+        } else {
+            // 生产环境 - 连接到 Heroku
+            serverUrl = `wss://dtp-fab1bc8fc9e9.herokuapp.com?type=controller`;
+        }
         
         function connectWebSocket() {
             updateDebugInfo(`尝试连接: ${serverUrl}`);
