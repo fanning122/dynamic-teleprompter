@@ -1,48 +1,36 @@
 const WebSocket = require('ws');
 const http = require('http');
-const fs = require('fs');
-const path = require('path');
 
-// 创建HTTP服务器
+// 创建HTTP服务器 - 简化版本，只处理WebSocket
 const server = http.createServer((req, res) => {
     console.log(`收到HTTP请求: ${req.url}`);
     
-    let filePath = '';
-    
-    if (req.url === '/' || req.url === '/index.html') {
-        filePath = path.join(__dirname, 'index.html');
-    } else if (req.url === '/display.html') {
-        filePath = path.join(__dirname, 'display.html');
-    } else if (req.url === '/controller.html') {
-        filePath = path.join(__dirname, 'controller.html');
-    } else {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-    }
-    
-    // 读取并返回HTML文件
-    fs.readFile(filePath, (err, data) => {
-        if (err) {
-            console.error(`读取文件错误: ${filePath}`, err);
-            res.writeHead(500);
-            res.end('Error loading file');
-            return;
-        }
-        
+    // 简单的根路径响应
+    if (req.url === '/') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
-        res.end(data);
-        console.log(`成功提供文件: ${req.url}`);
-    });
+        res.end(`
+            <html>
+                <head><title>Teleprompter WebSocket Server</title></head>
+                <body>
+                    <h1>Teleprompter WebSocket Server is Running</h1>
+                    <p>Server: ${process.env.HEROKU_APP_NAME || 'Local'}</p>
+                    <p>Port: ${process.env.PORT || 3000}</p>
+                    <p>Status: ✅ Connected clients: ${Object.values(connections).filter(Boolean).length}</p>
+                </body>
+            </html>
+        `);
+    } else {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('Teleprompter WebSocket Server');
+    }
 });
 
 // 创建WebSocket服务器
 const wss = new WebSocket.Server({ 
     server,
-    // 增加客户端验证
     verifyClient: (info) => {
         console.log(`WebSocket连接尝试: ${info.req.url}`);
-        return true; // 允许所有连接
+        return true;
     }
 });
 
@@ -50,6 +38,25 @@ let connections = {
     display: null,
     controller: null
 };
+
+// 改进的消息转发函数
+function forwardMessage(sourceType, targetType, data) {
+    const source = connections[sourceType];
+    const target = connections[targetType];
+    
+    if (target && target.readyState === WebSocket.OPEN) {
+        console.log(`转发消息: ${sourceType} -> ${targetType}`, data.type);
+        target.send(JSON.stringify({
+            ...data,
+            forwarded: true,
+            timestamp: Date.now()
+        }));
+        return true;
+    } else {
+        console.log(`无法转发: ${targetType} 未连接`);
+        return false;
+    }
+}
 
 wss.on('connection', (ws, req) => {
     const url = req.url;
@@ -66,54 +73,84 @@ wss.on('connection', (ws, req) => {
     }
     
     console.log(`客户端注册为: ${clientType}`);
+    console.log(`当前连接: 控制器 ${connections.controller ? '✅' : '❌'}, 显示器 ${connections.display ? '✅' : '❌'}`);
     
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            console.log(`从${clientType}收到消息:`, data);
+            console.log(`从 ${clientType} 收到消息:`, data.type, data);
             
-            // 控制器发送指令给显示器
-            if (clientType === 'controller' && connections.display) {
-                console.log('转发消息到显示端');
-                connections.display.send(JSON.stringify(data));
+            // 控制器 -> 显示器 消息转发
+            if (clientType === 'controller') {
+                const success = forwardMessage('controller', 'display', data);
+                
+                // 如果转发失败，通知控制器
+                if (!success) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: '显示端未连接',
+                        timestamp: Date.now()
+                    }));
+                }
             }
             
-            // 显示器发送状态给控制器（可选）
-            if (clientType === 'display' && connections.controller) {
-                console.log('转发消息到控制端');
-                connections.controller.send(JSON.stringify(data));
+            // 显示器 -> 控制器 消息转发（位置更新等）
+            if (clientType === 'display' && data.type === 'positionUpdate') {
+                forwardMessage('display', 'controller', data);
             }
+            
         } catch (error) {
             console.error('消息解析错误:', error);
         }
     });
     
-    ws.on('close', () => {
-        console.log(`${clientType}客户端断开连接`);
+    ws.on('close', (code, reason) => {
+        console.log(`${clientType} 客户端断开连接: ${code} - ${reason}`);
         if (clientType === 'display') {
             connections.display = null;
         } else if (clientType === 'controller') {
             connections.controller = null;
         }
+        
+        // 通知另一端连接状态变化
+        notifyConnectionStatus();
     });
     
     ws.on('error', (error) => {
         console.error(`${clientType} WebSocket错误:`, error);
     });
     
-    // 发送欢迎消息
+    // 发送连接确认消息
     ws.send(JSON.stringify({
         type: 'welcome',
-        message: `已连接为${clientType}`,
-        role: clientType
+        message: `已连接为 ${clientType}`,
+        role: clientType,
+        timestamp: Date.now()
     }));
+    
+    // 通知另一端新连接
+    notifyConnectionStatus();
 });
 
+// 通知双方连接状态
+function notifyConnectionStatus() {
+    const status = {
+        type: 'connectionStatus',
+        controller: connections.controller ? 'connected' : 'disconnected',
+        display: connections.display ? 'connected' : 'disconnected',
+        timestamp: Date.now()
+    };
+    
+    [connections.controller, connections.display].forEach(ws => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify(status));
+        }
+    });
+}
+
 // 启动服务器
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, '0.0.0.0', () => {  // 监听所有网络接口
-    console.log(`服务器运行在 http://0.0.0.0:${PORT}`);
-    console.log(`本地访问: http://localhost:${PORT}`);
-    console.log(`网络访问: http://10.80.6.252:${PORT}`);
-    console.log('等待客户端连接...');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ 服务器运行在端口: ${PORT}`);
+    console.log('📡 等待客户端连接...');
 });
