@@ -373,14 +373,19 @@
             }
         }
         
-        function updateConnectionStatus(connected) {
+        function updateConnectionStatus(connected, message = '') {
             const statusElement = document.getElementById('connection-status');
+    
             if (connected) {
-                statusElement.textContent = '遥控器: 已连接';
-                statusElement.className = 'connection-status status-connected';
+                statusElement.textContent = '✅ 服务器: 已连接';
+                statusElement.style.color = 'green';
+                statusElement.style.fontSize = '18px';
+                statusElement.style.fontWeight = 'bold';
             } else {
-                statusElement.textContent = '遥控器: 未连接';
-                statusElement.className = 'connection-status status-disconnected';
+                statusElement.textContent = '❌ 服务器: 未连接 - ' + message;
+                statusElement.style.color = 'red';
+                statusElement.style.fontSize = '18px';
+                statusElement.style.fontWeight = 'bold';
             }
         }
         
